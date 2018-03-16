@@ -1,8 +1,55 @@
+import copy
 from unittest import TestCase
-
+from datetime import datetime
+from datadog import statsd as original_statsd
 from mock import Mock, call, patch
 
-from base import SafeStatsd, logger
+from base import DEFAULT_SAFEGUARDED_METHODS, SafeStatsd, logger
+from statsd import safe_statsd
+
+
+SIMPLE_STATSD_METRIC_KWARGS = {
+    'metric': 'vault.capability.detail.something_happened',
+    'value': 2020,
+    'tags': ['tag1', 'tag2', 'tag3'],
+    'sample_rate': 0.1
+}
+
+
+EXPECTED_CALLS_FIXTURES = {
+    # ['method_name', 'call_args', '._report(call_args)]
+    'increment': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
+    'decrement': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
+    'gauge': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
+    'histogram': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
+    'distribution': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
+    'timing': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
+    'set': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
+    'timed': {
+        'metric': 'vault.capability.detail.something_happened',
+        'tags': ['tag1', 'tag2', 'tag3'],
+        'sample_rate': 0.1
+    },
+    'event': {
+        'title': 'testing title',
+        'text': 'description here',
+        'alert_type': 'error',
+        'aggregation_key': 'agg_key',
+        'source_type_name': 'source_type',
+        'date_happened': 123456,
+        'priority': 1,
+        'tags': ['tag1', 'tag2', 'tag3'],
+        'hostname': 'vault'
+    },
+    'service_check': {
+        'check_name': 'health_check_1',
+        'status': 'healthy',
+        'tags': ['tag1', 'tag2', 'tag3'],
+        'timestamp': 1234567,
+        'hostname': 'vault',
+        'message': 'I am healthy'
+    }
+}
 
 
 class TestSafeStatsd(TestCase):
@@ -29,79 +76,95 @@ class TestSafeStatsd(TestCase):
             test_statsd.logging_function, logger.exception
         )
 
-    @patch('base.logger')
-    def test_exception_free_call(self, mock_logger):
+    def test_default_methods_acceptable(self):
         """
-        Exceptions should not be raised inside the context manager, instead
-        we log the error.
+        Sanity check for base DEFAULT_SAFEGUARDED_METHODS
+        if statsd datadog got changed or our default safeguarded methods are
+        referenceing something that does not exists.
         """
-        ERROR_MESSAGE = 'I am pretend statsd error'
-        mock_logger.fake = Mock()
-        test_statsd = SafeStatsd(log_level='fake')
-        with test_statsd._exception_free_call():
-            raise Exception(ERROR_MESSAGE)
-        self.assertEqual(
-            mock_logger.fake.call_args_list,
-            [call('I am pretend statsd error')]
+        from datadog.dogstatsd.base import DogStatsd
+        for prop in DEFAULT_SAFEGUARDED_METHODS:
+            method = getattr(DogStatsd, prop)
+            if not callable(method):
+                raise AttributeError('%s is not callable', prop)
+
+    def test_exception_free_call(self):
+        """
+        A function decorated with the wrapper
+        _exception_free_call
+        should never raise exception, instead it would log the exception.
+        """
+        with patch('statsd.base.logger.info') as mock_logger:
+            safe_statsd = SafeStatsd(log_level='info', safeguarded_methods='')
+
+        funky_method = Mock(
+            autospec=True, side_effect=ValueError('Funky statsd error'),
+            __name__='functools_require_this'
+        )
+        safe_funky_method = safe_statsd._exception_free_call(funky_method)
+        safe_funky_method('some event here')
+        mock_logger.assert_called_once_with('Funky statsd error')
+
+    def test_safeguard_method(self):
+        """
+        safeguard_method should replace the method with another
+        safe version of that method.
+        """
+        with patch('statsd.base.logger') as mock_logger:
+            safe_statsd = SafeStatsd(log_level='meltdown')
+        safe_statsd.test_method = Mock(
+            autospec=True, side_effect=ValueError('Funky statsd error'),
+            __name__='functools_require_this'
+        )
+        with self.assertRaisesRegexp(ValueError, 'Funky statsd error'):
+            safe_statsd.test_method()
+
+        safe_statsd._safeguard_method('test_method')
+        safe_statsd.test_method('I am safe now!')
+        mock_logger.meltdown.assert_called_once_with('Funky statsd error')
+
+    def test_safeguard_method_non_existant_method(self):
+        """
+        If a method does not exist, the logic should not break.
+        """
+        with patch('statsd.base.logger') as mock_logger:
+            safe_statsd = SafeStatsd(log_level='meltdown')
+            safe_statsd._safeguard_method('not_a_method')
+
+        mock_logger.meltdown.assert_called_once_with(
+            '%s is not a statsd property', 'not_a_method'
         )
 
-    @patch('base.statsd')
-    def test_increment(self, mock_statsd):
+    def test_safeguard_method_non_callable_property(self):
         """
-        Test increment passing to statsd increment.
+        If a method does not exist, the logic should not break.
         """
-        safe_statsd = SafeStatsd()
-        safe_statsd.increment(
-            'metric',
-            value=5,
-            tags=['tag1', 'tag2'],
-            sample_rate=21
-        )
-        mock_statsd.increment.assert_called_with(
-            'metric', 5, ['tag1', 'tag2'], 21
+        with patch('statsd.base.logger') as mock_logger:
+            safe_statsd = SafeStatsd(log_level='meltdown')
+            safe_statsd._safeguard_method('SAFEGUARDED_METHODS')
+
+        mock_logger.meltdown.assert_called_once_with(
+            '%s is not a statsd method', 'SAFEGUARDED_METHODS'
         )
 
-    @patch('base.statsd')
-    def test_event(self, mock_statsd):
+    def test_class_functions(self):
         """
-        Test event passing to (statsd.event).
+        Sanity check: A call from the safe wrapper should be equal to
+        a call from the original library.
+        If you add new functions or if statsd is updated, please
+        change the fixture accordingly.
         """
-        safe_statsd = SafeStatsd()
-        safe_statsd.event(
-            'event_title',
-            'event_text',
-            alert_type='Error',
-            aggregation_key='aggregation_key',
-            source_type_name='source_type_name',
-            date_happened='data_here', priority=1,
-            tags=['list', 'of', 'tags'], hostname='holvi.something'
-        )
-        mock_statsd.event.assert_called_with(
-            'event_title',
-            'event_text',
-            'Error',
-            'aggregation_key',
-            'source_type_name',
-            'data_here', 1,
-            ['list', 'of', 'tags'],
-            'holvi.something'
-        )
+        for method, call_args in EXPECTED_CALLS_FIXTURES.items():
+            with patch('datadog.statsd._send_to_server') as mock_original_send:
+                mock_original_send.clear_mock()
+                getattr(original_statsd, method)(**call_args)
 
-    @patch('base.statsd')
-    def test_timing(self, mock_statsd):
-        """
-        Test timing event passing to statsd.timing
-        """
-        safe_statsd = SafeStatsd()
-        safe_statsd.timing(
-            metric='metric_name',
-            value=123,
-            tags=['some', 'ragged', 'tags'],
-            sample_rate=20
-        )
-        mock_statsd.timing.assert_called_with(
-            'metric_name',
-            123,
-            ['some', 'ragged', 'tags'],
-            20
-        )
+            with patch('statsd.safe_statsd'
+                       '._send_to_server') as mock_safe_class_send:
+                mock_safe_class_send.clear_mock()
+                getattr(original_statsd, method)(**call_args)
+
+            self.assertEqual(
+                mock_original_send.call_args_list,
+                mock_safe_class_send.call_args_list
+            )
