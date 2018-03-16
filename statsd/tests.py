@@ -168,3 +168,16 @@ class TestSafeStatsd(TestCase):
                 mock_original_send.call_args_list,
                 mock_safe_class_send.call_args_list
             )
+
+    def test_all_methods_are_covered_by_tests(self):
+        """
+        Test that the default methods in base module are all covered
+        in the fixture to be tested.
+        """
+        methods_tested = [
+            method for method, _ in EXPECTED_CALLS_FIXTURES.items() 
+        ]
+        self.assertItemsEqual(
+            actual_seq=methods_tested,
+            expected_seq=DEFAULT_SAFEGUARDED_METHODS
+        )
