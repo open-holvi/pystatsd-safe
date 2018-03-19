@@ -4,7 +4,7 @@ from datetime import datetime
 from datadog import statsd as original_statsd
 from mock import Mock, call, patch
 
-from base import DEFAULT_SAFEGUARDED_METHODS, SafeDogStatsd, logger
+from statsd.base import DEFAULT_SAFEGUARDED_METHODS, SafeDogStatsd, logger
 from statsd import safe_statsd
 
 
@@ -177,7 +177,7 @@ class TestSafeDogStatsd(TestCase):
         methods_tested = [
             method for method, _ in EXPECTED_CALLS_FIXTURES.items() 
         ]
-        self.assertItemsEqual(
-            actual_seq=methods_tested,
-            expected_seq=DEFAULT_SAFEGUARDED_METHODS
+        self.assertEqual(
+            methods_tested.sort(),
+            DEFAULT_SAFEGUARDED_METHODS.sort()
         )
