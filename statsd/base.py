@@ -1,5 +1,4 @@
 import logging
-from contextlib import contextmanager
 from functools import wraps
 
 from datadog.dogstatsd.base import DogStatsd
