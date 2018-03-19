@@ -12,7 +12,7 @@ DEFAULT_SAFEGUARDED_METHODS = [
 ]
 
 
-class SafeStatsd(DogStatsd):
+class SafeDogStatsd(DogStatsd):
     """
     Safe wrapper around datadog statsd library.
     Class methods will try to call statsd without raising any exception
@@ -24,7 +24,7 @@ class SafeStatsd(DogStatsd):
         Instantiate a new object with the error level specified.
         The level fallback on exception if the logger provided is unusable
         """
-        super(DogStatsd, self).__init__()
+        super(SafeDogStatsd, self).__init__()
         try:
             self.logging_function = getattr(logger, log_level)
         except AttributeError:

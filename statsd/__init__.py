@@ -1,4 +1,4 @@
-from statsd.base import SafeStatsd
+from statsd.base import SafeDogStatsd
 
 
-safe_statsd = SafeStatsd()
+safe_statsd = SafeDogStatsd()

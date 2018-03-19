@@ -4,7 +4,7 @@ from datetime import datetime
 from datadog import statsd as original_statsd
 from mock import Mock, call, patch
 
-from base import DEFAULT_SAFEGUARDED_METHODS, SafeStatsd, logger
+from base import DEFAULT_SAFEGUARDED_METHODS, SafeDogStatsd, logger
 from statsd import safe_statsd
 
 
@@ -52,26 +52,26 @@ EXPECTED_CALLS_FIXTURES = {
 }
 
 
-class TestSafeStatsd(TestCase):
+class TestSafeDogStatsd(TestCase):
     """
-    Tests for SafeStatsd.
+    Tests for SafeDogStatsd.
     """
     def test_init_with_accepted_level(self):
         """
-        SafeStatsd should have the correct level if instasiated with
+        SafeDogStatsd should have the correct level if instasiated with
         acceptable level.
         """
-        test_statsd = SafeStatsd(log_level='info')
+        test_statsd = SafeDogStatsd(log_level='info')
         self.assertEqual(
             test_statsd.logging_function, logger.info
         )
 
     def test_init_with_bad_level(self):
         """
-        SafeStatsd should have "exception" level if instasiated with
+        SafeDogStatsd should have "exception" level if instasiated with
         unacceptable level.
         """
-        test_statsd = SafeStatsd(log_level='fantasy')
+        test_statsd = SafeDogStatsd(log_level='fantasy')
         self.assertEqual(
             test_statsd.logging_function, logger.exception
         )
@@ -95,7 +95,7 @@ class TestSafeStatsd(TestCase):
         should never raise exception, instead it would log the exception.
         """
         with patch('statsd.base.logger.info') as mock_logger:
-            safe_statsd = SafeStatsd(log_level='info', safeguarded_methods='')
+            safe_statsd = SafeDogStatsd(log_level='info', safeguarded_methods='')
 
         funky_method = Mock(
             autospec=True, side_effect=ValueError('Funky statsd error'),
@@ -111,7 +111,7 @@ class TestSafeStatsd(TestCase):
         safe version of that method.
         """
         with patch('statsd.base.logger') as mock_logger:
-            safe_statsd = SafeStatsd(log_level='meltdown')
+            safe_statsd = SafeDogStatsd(log_level='meltdown')
         safe_statsd.test_method = Mock(
             autospec=True, side_effect=ValueError('Funky statsd error'),
             __name__='functools_require_this'
@@ -128,7 +128,7 @@ class TestSafeStatsd(TestCase):
         If a method does not exist, the logic should not break.
         """
         with patch('statsd.base.logger') as mock_logger:
-            safe_statsd = SafeStatsd(log_level='meltdown')
+            safe_statsd = SafeDogStatsd(log_level='meltdown')
             safe_statsd._safeguard_method('not_a_method')
 
         mock_logger.meltdown.assert_called_once_with(
@@ -140,7 +140,7 @@ class TestSafeStatsd(TestCase):
         If a method does not exist, the logic should not break.
         """
         with patch('statsd.base.logger') as mock_logger:
-            safe_statsd = SafeStatsd(log_level='meltdown')
+            safe_statsd = SafeDogStatsd(log_level='meltdown')
             safe_statsd._safeguard_method('SAFEGUARDED_METHODS')
 
         mock_logger.meltdown.assert_called_once_with(
