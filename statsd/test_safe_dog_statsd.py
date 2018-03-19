@@ -1,12 +1,15 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import copy
-from unittest import TestCase
 from datetime import datetime
+from unittest import TestCase
+
 from datadog import statsd as original_statsd
 from mock import Mock, call, patch
 
-from statsd.base import DEFAULT_SAFEGUARDED_METHODS, SafeDogStatsd, logger
 from statsd import safe_statsd
-
+from statsd.base import DEFAULT_SAFEGUARDED_METHODS, SafeDogStatsd, logger
 
 SIMPLE_STATSD_METRIC_KWARGS = {
     'metric': 'vault.capability.detail.something_happened',
