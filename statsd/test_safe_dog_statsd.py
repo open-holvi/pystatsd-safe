@@ -95,7 +95,10 @@ class TestSafeDogStatsd(TestCase):
         should never raise exception, instead it would log the exception.
         """
         with patch('statsd.base.logger.info') as mock_logger:
-            safe_statsd = SafeDogStatsd(log_level='info', safeguarded_methods='')
+            safe_statsd = SafeDogStatsd(
+                log_level='info',
+                safeguarded_methods=''
+            )
 
         funky_method = Mock(
             autospec=True, side_effect=ValueError('Funky statsd error'),
@@ -175,7 +178,7 @@ class TestSafeDogStatsd(TestCase):
         in the fixture to be tested.
         """
         methods_tested = [
-            method for method, _ in EXPECTED_CALLS_FIXTURES.items() 
+            method for method, _ in EXPECTED_CALLS_FIXTURES.items()
         ]
         self.assertEqual(
             methods_tested.sort(),
