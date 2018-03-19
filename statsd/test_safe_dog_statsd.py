@@ -85,8 +85,7 @@ class TestSafeDogStatsd(TestCase):
         from datadog.dogstatsd.base import DogStatsd
         for prop in DEFAULT_SAFEGUARDED_METHODS:
             method = getattr(DogStatsd, prop)
-            if not callable(method):
-                raise AttributeError('%s is not callable', prop)
+            self.assertTrue(callable(method))
 
     def test_exception_free_call(self):
         """
