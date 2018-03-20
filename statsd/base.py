@@ -22,12 +22,13 @@ class SafeDogStatsd(DogStatsd):
     if that call fails.
     """
     def __init__(self, log_level='exception',
-                 safeguarded_methods=DEFAULT_SAFEGUARDED_METHODS):
+                 safeguarded_methods=DEFAULT_SAFEGUARDED_METHODS,
+                 *args, **kwargs):
         """
         Instantiate a new object with the error level specified.
         The level fallback on exception if the logger provided is unusable
         """
-        super(SafeDogStatsd, self).__init__()
+        super(SafeDogStatsd, self).__init__(*args, **kwargs)
         try:
             self.logging_function = getattr(logger, log_level)
         except AttributeError:
