@@ -110,6 +110,7 @@ class TestSafeDogStatsd(TestCase):
             self.funky_method
         )
         safe_funky_method('some event here')
+        mock_logger.assert_called_once_with('Funky statsd error')
 
     def test_safeguard_method(self):
         """
