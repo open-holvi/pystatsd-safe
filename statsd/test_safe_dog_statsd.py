@@ -18,9 +18,10 @@ SIMPLE_STATSD_METRIC_KWARGS = {
     'sample_rate': 0.1
 }
 
-
-EXPECTED_CALLS_FIXTURES = {
-    # ['method_name', 'call_args', '._report(call_args)]
+# How the calls for each method would look like. This is used
+# to compare calls made to safe wrapper against calls made to original library
+CALLS_FIXTURES = {
+    # ['method_name', 'call_args']
     'increment': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
     'decrement': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
     'gauge': copy.deepcopy(SIMPLE_STATSD_METRIC_KWARGS),
@@ -59,6 +60,9 @@ class TestSafeDogStatsd(TestCase):
     """
     Tests for SafeDogStatsd.
     """
+    def funky_method(self, *args, **kwargs):
+            raise ValueError('Funky statsd error')
+
     def test_init_with_accepted_level(self):
         """
         SafeDogStatsd should have the correct level if instasiated with
@@ -102,13 +106,10 @@ class TestSafeDogStatsd(TestCase):
                 safeguarded_methods=''
             )
 
-        funky_method = Mock(
-            autospec=True, side_effect=ValueError('Funky statsd error'),
-            __name__='functools_require_this'
+        safe_funky_method = safe_statsd._exception_free_call(
+            self.funky_method
         )
-        safe_funky_method = safe_statsd._exception_free_call(funky_method)
         safe_funky_method('some event here')
-        mock_logger.assert_called_once_with('Funky statsd error')
 
     def test_safeguard_method(self):
         """
@@ -117,10 +118,7 @@ class TestSafeDogStatsd(TestCase):
         """
         with patch('statsd.base.logger') as mock_logger:
             safe_statsd = SafeDogStatsd(log_level='meltdown')
-        safe_statsd.test_method = Mock(
-            autospec=True, side_effect=ValueError('Funky statsd error'),
-            __name__='functools_require_this'
-        )
+        safe_statsd.test_method = self.funky_method
         with self.assertRaisesRegexp(ValueError, 'Funky statsd error'):
             safe_statsd.test_method()
 
@@ -159,7 +157,7 @@ class TestSafeDogStatsd(TestCase):
         If you add new functions or if statsd is updated, please
         change the fixture accordingly.
         """
-        for method, call_args in EXPECTED_CALLS_FIXTURES.items():
+        for method, call_args in CALLS_FIXTURES.items():
             with patch('datadog.statsd._send_to_server') as mock_original_send:
                 mock_original_send.clear_mock()
                 getattr(original_statsd, method)(**call_args)
@@ -180,7 +178,7 @@ class TestSafeDogStatsd(TestCase):
         in the fixture to be tested.
         """
         methods_tested = [
-            method for method, _ in EXPECTED_CALLS_FIXTURES.items()
+            method for method, _ in CALLS_FIXTURES.items()
         ]
         self.assertEqual(
             methods_tested.sort(),
