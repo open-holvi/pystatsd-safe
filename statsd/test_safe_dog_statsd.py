@@ -185,3 +185,20 @@ class TestSafeDogStatsd(TestCase):
             methods_tested.sort(),
             DEFAULT_SAFEGUARDED_METHODS.sort()
         )
+
+    def test_timed_not_raises_exceptions(self):
+        """
+        Timed context manager should not raise an exception.
+        """
+        with patch('statsd.base.SafeDogStatsd._report',
+                   side_effect=Exception('error')):
+            with safe_statsd.timed('event'):
+                Mock()
+
+    def test_raise_exception_within_timed(self):
+        """
+        Exceptions raised within the timed block should propagate normally.
+        """
+        with self.assertRaises(ValueError):
+            with safe_statsd.timed('event'):
+                Mock(side_effect=ValueError)()
