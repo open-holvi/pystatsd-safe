@@ -45,6 +45,8 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+.pytest_cache/*
+junit-*.xml
 
 # Translations
 *.mo
@@ -99,3 +101,4 @@ ENV/
 
 # mypy
 .mypy_cache/
+.DS_Store
