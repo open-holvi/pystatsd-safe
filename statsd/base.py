@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import logging
 from functools import wraps
+from contextlib import contextmanager
 
 from datadog.dogstatsd.base import DogStatsd
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SAFEGUARDED_METHODS = [
     'increment', 'decrement', 'gauge', 'histogram',
-    'distribution', 'timing', 'timed', 'set', 'event', 'service_check'
+    'distribution', 'timing', 'set', 'event', 'service_check'
 ]
 
 
@@ -71,3 +72,26 @@ class SafeDogStatsd(DogStatsd):
         """
         for method_name in methods_names:
             self._safeguard_method(method_name=method_name)
+
+    @contextmanager
+    def timed(self, metric=None, tags=None, sample_rate=1, use_ms=None):
+        """
+        A decorator or context manager that will measure the distribution of a
+        function's/context's run time. Optionally specify a list of tags or a
+        sample rate. If the metric is not defined as a decorator, the module
+        name and function name will be used. The metric is required as a
+        context manager.
+        This implementation overrides the original DogStatsd because it is
+        not pythonic to wrap a wrapper.
+        Implementation here based one:
+        https://github.com/DataDog/datadogpy/blob/241840616fea2ecc7254a12b86be8ffab7f18a3a/datadog/dogstatsd/base.py#L229-L234
+        """
+        import time
+        start_time = time.time()
+        try:
+            yield
+        except Exception as error:
+            raise error
+        else:
+            finish_time = time.time()
+            self.timing(metric, finish_time - start_time, tags, sample_rate)
